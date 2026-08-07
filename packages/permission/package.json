@@ -1,0 +1,38 @@
+{
+  "name": "@work-holo/permission",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./client": {
+      "default": "./src/client.ts"
+    },
+    "./seed": {
+      "default": "./src/seed.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "generate:permissions": "bun run ./scripts/generate-permission-code.ts",
+    "seed:permissions": "bun run ./scripts/seed-permissions.ts"
+  },
+  "devDependencies": {
+    "@work-holo/config": "workspace:*",
+    "pusher": "^5.3.4"
+  },
+  "peerDependencies": {
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@orpc/server": "^1.14.6",
+    "@work-holo/db": "workspace:*",
+    "@work-holo/env": "workspace:*",
+    "casbin": "^5.50.0",
+    "casbin-drizzle-adapter": "^1.1.2",
+    "drizzle-orm": "^0.45.2",
+    "@work-holo/infrastructure": "workspace:*"
+  }
+}

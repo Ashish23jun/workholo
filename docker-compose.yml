@@ -1,0 +1,182 @@
+name: "work-holo"
+
+services:
+  postgres:
+    image: postgres:18.4-alpine3.23
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_wal_senders=10"
+      - "-c"
+      - "max_replication_slots=12"
+      - "-c"
+      - "max_slot_wal_keep_size=4GB"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  electric:
+    image: docker.io/electricsql/electric:1.7.0
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
+      # Not suitable for production. Only use insecure mode in development or if you've otherwise secured the Electric API.
+      # See https://electric-sql.com/docs/guides/security
+      ELECTRIC_INSECURE: true
+      ELECTRIC_FEATURE_FLAGS: allow_subqueries,tagged_subqueries
+    ports:
+      - "5003:3000"
+
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.39.0
+    ports:
+      - "6379:6379"
+    ulimits:
+      memlock: -1
+    command: dragonfly --logtostderr --proactor_threads=3 --maxmemory=1GB
+    volumes:
+      - dragonfly_data:/data
+
+  rabbitmq:
+    image: rabbitmq:4.3.1-management-alpine
+    ports:
+      - "5672:5672" # AMQP port
+      - "15672:15672" # Management UI port
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  opensearch:
+    image: opensearchproject/opensearch:3.7.0
+    ports:
+      - "9200:9200" # REST API port
+      - "9600:9600" # Performance analyzer port
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rustfs:
+    image: "rustfs/rustfs:1.0.0-beta.8"
+    restart: unless-stopped
+    user: "0:0"
+    security_opt:
+      - "no-new-privileges:true"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      RUSTFS_ADDRESS: "0.0.0.0:9000"
+      RUSTFS_CONSOLE_ADDRESS: "0.0.0.0:9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_BROWSER_REDIRECT: "true"
+      RUSTFS_VOLUMES: "/data/rustfs{0..2}"
+      RUSTFS_ACCESS_KEY: "GuzpNFteD5xLQ_aoBlUvyw"
+      RUSTFS_SECRET_KEY: "zmvR18mhKg3hDlKfdtfp_g"
+      RUSTFS_EXTERNAL_ADDRESS: ":9000"
+      RUSTFS_UNSAFE_BYPASS_DISK_CHECK: "true"
+    volumes:
+      - "~/data/volumes/storage:/data"
+    healthcheck:
+      test:
+        - CMD
+        - sh
+        - "-c"
+        - "curl -f http://127.0.0.1:9000/health && curl -f http://127.0.0.1:9001/rustfs/console/health"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  soketi:
+    image: "quay.io/soketi/soketi:1.6.1-16-debian"
+    ports:
+      - "6001:6001"
+      - "9601:9601"
+    environment:
+      SOKETI_DEBUG: "1"
+      SOKETI_METRICS_SERVER_PORT: "9601"
+      SOKETI_DEFAULT_APP_ID: "work-holo"
+      SOKETI_DEFAULT_APP_KEY: "work-holo-key"
+      SOKETI_DEFAULT_APP_SECRET: "work-holo-secret-must-be-32-chars"
+      SOKETI_DEFAULT_APP_ENABLE_CLIENT_MESSAGES: "true"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "const http = require(''http''); const req = http.request({hostname: ''localhost'', port: 6001, path: ''/'', method: ''GET''}, (res) => { process.exit(res.statusCode === 200 || res.statusCode === 404 ? 0 : 1); }); req.on(''error'', () => process.exit(1)); req.end();"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  imgproxy:
+    image: darthsim/imgproxy:v4.0.4
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Security (generate your own keys for production)
+      IMGPROXY_KEY: "943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881"
+      IMGPROXY_SALT: "520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5"
+      # Basic settings
+      IMGPROXY_MAX_SRC_RESOLUTION: "16.8" # 16.8 megapixels
+      IMGPROXY_JPEG_PROGRESSIVE: "false"
+      IMGPROXY_PNG_INTERLACED: "false"
+      IMGPROXY_QUALITY: "80"
+      IMGPROXY_AUTO_WEBP: "true"
+      IMGPROXY_AUTO_AVIF: "true"
+      IMGPROXY_USE_S3: "true"
+      IMGPROXY_S3_ENDPOINT: "http://127.0.0.1:9000"
+      IMGPROXY_AWS_ACCESS_KEY_ID: "GuzpNFteD5xLQ_aoBlUvyw"
+      IMGPROXY_AWS_SECRET_ACCESS_KEY: "zmvR18mhKg3hDlKfdtfp_g"
+    healthcheck:
+      test: ["CMD", "imgproxy", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  seeder:
+    build:
+      context: .
+      dockerfile: apps/seeder/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
+    profiles:
+      - seed
+
+volumes:
+  dragonfly_data:
+  rabbitmq_data:
+  postgres_data:
+  opensearch_data:

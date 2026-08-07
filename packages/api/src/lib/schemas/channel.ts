@@ -1,0 +1,231 @@
+import {
+  ChannelInsertSchema,
+  ChannelSchema,
+  ChannelTypeSchema,
+  UserSchema,
+} from "@work-holo/db/lib/schemas/db-tables";
+import { z } from "zod";
+
+// Create channel input
+export const CreateChannelInput = ChannelInsertSchema.omit({
+  organizationId: true,
+}).extend({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  teamId: z.string().optional(),
+  memberIds: z.array(z.string()),
+});
+
+export const CreateChannelOutput = z.object({
+  txid: z.number(),
+  channel: ChannelSchema,
+});
+
+// Update channel input
+export const UpdateChannelInput = z.object({
+  channelId: z.string(),
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional(),
+  isPrivate: z.boolean().optional(),
+  isArchived: z.boolean().optional(),
+});
+
+export type UpdateChannelInputType = z.infer<typeof UpdateChannelInput>;
+
+// Get channel input
+export const GetChannelInput = z.object({
+  channelId: z.string(),
+});
+
+export const GetChannelOutput = ChannelSchema.extend({
+  creator: UserSchema,
+});
+
+// Get channels input
+export const GetChannelsInput = z.object({
+  type: ChannelTypeSchema.optional(),
+  teamId: z.string().optional(),
+  includeArchived: z.boolean().default(false),
+  limit: z.number().min(1).max(100).default(50),
+  offset: z.number().min(0).default(0),
+});
+
+export const ListChannelsInput = z
+  .object({
+    page: z.number().default(1),
+    limit: z.number().default(10),
+    search: z.string().optional(),
+    filters: z
+      .object({
+        type: ChannelTypeSchema.optional(),
+        teamId: z.string().optional(),
+        includeArchived: z.boolean().default(false),
+      })
+      .optional(),
+    sorting: z
+      .array(
+        z.object({
+          id: z.string(),
+          desc: z.boolean(),
+        })
+      )
+      .optional(),
+  })
+  .optional()
+  .default({ page: 1, limit: 10 });
+
+const ChannelWithCreator = ChannelSchema.extend({
+  creator: UserSchema,
+});
+
+export const ListChannelsOutput = z.object({
+  channels: z.array(ChannelWithCreator),
+  total: z.number(),
+  pageCount: z.number(),
+});
+
+// Add channel member input
+export const ModifyChannelMembersInput = z.object({
+  channelId: z.string(),
+  memberIds: z.array(z.string()),
+});
+
+// Remove channel member input
+export const RemoveChannelMemberInput = z.object({
+  channelId: z.string(),
+  userId: z.string(),
+});
+
+// Update channel member input
+export const UpdateChannelMemberInput = z.object({
+  channelId: z.string(),
+  userId: z.string(),
+  role: z.enum(["member", "admin", "moderator"]).optional(),
+  isMuted: z.boolean().optional(),
+});
+
+// Get channel members input
+export const ListChannelMembersInput = z.object({
+  channelId: z.string(),
+  filter: z
+    .object({
+      role: z.string().optional(),
+    })
+    .optional(),
+  limit: z.number().min(1).max(100).default(50),
+  offset: z.number().min(0).default(0),
+});
+
+export const ListChannelMembersOutput = z.array(
+  UserSchema.pick({
+    id: true,
+    name: true,
+    email: true,
+    image: true,
+  }).extend({
+    role: z.string().nullable(),
+    joinedAt: z.date(),
+  })
+);
+// Join channel input
+export const JoinChannelInput = z.object({
+  channelId: z.string(),
+});
+
+// Leave channel input
+export const LeaveChannelInput = z.object({
+  channelId: z.string(),
+});
+
+// Archive channel input
+export const ArchiveChannelInput = z.object({
+  channelId: z.string(),
+});
+
+// Delete channel input
+export const DeleteChannelInput = z.object({
+  channelId: z.string(),
+});
+
+export const DeletechannelOutput = z.object({
+  txid: z.number(),
+});
+
+// Channel output schema
+export const ChannelOutput = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  type: ChannelTypeSchema,
+  organizationId: z.string(),
+  teamId: z.string().nullable(),
+  createdBy: z.string(),
+  isPrivate: z.boolean(),
+  isArchived: z.boolean(),
+  lastMessageAt: z.date().nullable(),
+  messageCount: z.number(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+// Channel with creator info
+export const ChannelWithCreatorOutput = ChannelOutput.extend({
+  creatorName: z.string().nullable(),
+  creatorImage: z.string().nullable(),
+});
+
+// Channel member output schema
+export const ChannelMemberOutput = z.object({
+  id: z.string(),
+  channelId: z.string(),
+  userId: z.string(),
+  role: z.string(),
+  joinedAt: z.date(),
+  lastReadAt: z.date().nullable(),
+  isMuted: z.boolean(),
+  userName: z.string().nullable(),
+  userImage: z.string().nullable(),
+  userEmail: z.string().nullable(),
+});
+
+// Channel with members count
+export const ChannelWithStatsOutput = ChannelWithCreatorOutput.extend({
+  memberCount: z.number(),
+  unreadCount: z.number().optional(),
+});
+
+// Channels list output
+export const ChannelsListOutput = z.object({
+  channels: z.array(ChannelWithStatsOutput),
+  total: z.number(),
+  hasMore: z.boolean(),
+});
+
+// Channel members list output
+export const ChannelMembersListOutput = z.object({
+  members: z.array(ChannelMemberOutput),
+  total: z.number(),
+  hasMore: z.boolean(),
+});
+
+// Success response
+export const SuccessOutput = z.object({
+  success: z.boolean(),
+  message: z.string().optional(),
+});
+
+export const IsChannelMemberInput = z.object({
+  channelId: z.string(),
+});
+
+export const IsChannelMemberOutput = z.boolean();
+
+// Get channel unread counts
+export const GetChannelUnreadCountsInput = z.object({});
+
+export const GetChannelUnreadCountsOutput = z.array(
+  z.object({
+    channelId: z.string(),
+    unreadCount: z.number(),
+  })
+);

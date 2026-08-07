@@ -1,0 +1,27 @@
+{
+  "name": "@work-holo/env",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server": "./src/server.ts",
+    "./www": "./src/www.ts",
+    "./web": "./src/web.ts",
+    "./native": "./src/native.ts",
+    "./realtime": "./src/realtime.ts",
+    "./read-receipt": "./src/read-receipt.ts",
+    "./notification-worker": "./src/notification-worker.ts",
+    "./search-worker": "./src/search-worker.ts",
+    "./db": "./src/db.ts"
+  },
+  "dependencies": {
+    "@t3-oss/env-core": "^0.13.11",
+    "dotenv": "^17.4.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@work-holo/config": "workspace:*",
+    "typescript": "^6.0.3"
+  }
+}
